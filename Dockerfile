@@ -1,46 +1,51 @@
-# AI-bot Dockerfile
-# Multi-stage build para producción optimizada
-# Uso: docker build -t library-ai-bot . && docker run -p 5175:5175 -e VITE_API_URL=https://api.tudominio.com library-ai-bot
-
 # ============================================
 # Stage 1: Builder
 # ============================================
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Instalar dependencias de build (python, make, g++ para native modules)
+# Build dependencies
 RUN apk add --no-cache python3 make g++
 
-# Copiar package files primero para aprovechar cache de Docker
+# Cache deps layer
 COPY package*.json ./
+RUN npm ci --prefer-offline --no-audit --no-fund
 
-# Instalar dependencias (incluye devDependencies para build)
-RUN npm ci
-
-# Copiar código fuente
+# Source + build
 COPY . .
-
-# Build de producción
 RUN npm run build
 
 # ============================================
-# Stage 2: Production (nginx static server)
+# Stage 2: Runtime (nginx + envsubst)
 # ============================================
-FROM nginx:alpine AS production
+FROM nginx:alpine AS runtime
+
+WORKDIR /usr/share/nginx/html
+
+# Instalar gettext para envsubst
+RUN apk add --no-cache gettext
 
 # Copiar build output
-COPY --from=builder /app/dist /usr/share/nginx/html
+COPY --from=builder /app/dist ./
 
-# Copiar configuración nginx personalizada
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copiar nginx config template + entrypoint + templates
+COPY nginx.conf.template /etc/nginx/conf.d/default.conf.template
+COPY entrypoint.sh /entrypoint.sh
+COPY public/config.template.js ./config.template.js
+COPY public/health.json ./health.json
 
-# Exponer puerto
+# Non-root user
+RUN addgroup -g 1001 -S nginx && \
+    adduser -S nginx -u 1001 -G nginx && \
+    chown -R nginx:nginx /usr/share/nginx/html /var/cache/nginx /var/log/nginx /etc/nginx/conf.d && \
+    chmod +x /entrypoint.sh
+
+USER nginx
+
 EXPOSE 5175
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:5175/ || exit 1
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:5175/health || exit 1
 
-# Iniciar nginx
-CMD ["nginx", "-g", "daemon off;"]
+ENTRYPOINT ["/entrypoint.sh"]

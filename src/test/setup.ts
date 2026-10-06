@@ -1,18 +1,45 @@
-import { vi } from "vitest";
+import '@testing-library/jest-dom';
+import { vi } from 'vitest';
 
-Object.defineProperty(window, "localStorage", {
-  value: {
-    getItem: vi.fn(),
-    setItem: vi.fn(),
-    removeItem: vi.fn(),
-    clear: vi.fn(),
-  },
+const localStorageMock = (() => {
+  let store: Record<string, string> = {};
+  return {
+    getItem: vi.fn((key: string) => store[key] ?? null),
+    setItem: vi.fn((key: string, value: string) => {
+      store[key] = value;
+    }),
+    removeItem: vi.fn((key: string) => {
+      delete store[key];
+    }),
+    clear: vi.fn(() => {
+      store = {};
+    }),
+    getStore: () => store,
+    setStore: (newStore: Record<string, string>) => {
+      store = newStore;
+    },
+  };
+})();
+
+Object.defineProperty(window, 'localStorage', {
+  value: localStorageMock,
   writable: true,
 });
 
-Object.defineProperty(window, "crypto", {
-  value: {
-    randomUUID: () => "test-uuid-" + Math.random().toString(36).slice(2),
-  },
+Object.defineProperty(window, 'location', {
+  value: { href: '/' },
   writable: true,
+});
+
+HTMLDialogElement.prototype.showModal = vi.fn();
+HTMLDialogElement.prototype.close = vi.fn();
+
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom');
+  return {
+    ...actual,
+    useNavigate: () => vi.fn(),
+    useLocation: () => ({ pathname: '/' }),
+    useParams: () => ({}),
+  };
 });
