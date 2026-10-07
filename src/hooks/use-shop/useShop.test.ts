@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useShop } from './index';
 
@@ -7,7 +7,7 @@ vi.mock('../../api/bot/bot', () => ({
   getBotConfig: vi.fn(),
 }));
 
-const { getBotConfig } = await import('../../api/bot/bot');
+import { getBotConfig } from '../../api/bot/bot';
 
 describe('useShop', () => {
   beforeEach(() => {
