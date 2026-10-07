@@ -2,7 +2,6 @@
 # Stage 1: Builder
 # ============================================
 FROM node:22-alpine AS builder
-
 WORKDIR /app
 
 # Build dependencies
@@ -10,7 +9,7 @@ RUN apk add --no-cache python3 make g++
 
 # Cache deps layer
 COPY package*.json ./
-RUN npm ci --prefer-offline --no-audit --no-fund
+RUN npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund
 
 # Source + build
 COPY . .
@@ -36,14 +35,16 @@ COPY public/config.template.js ./config.template.js
 COPY public/health.json ./health.json
 
 # Non-root user (nginx user already exists in nginx:alpine base image)
-RUN chown -R nginx:nginx /usr/share/nginx/html /var/cache/nginx /var/log/nginx /etc/nginx/conf.d && \
+# Crear directorio /run/nginx con permisos correctos para el usuario nginx
+RUN mkdir -p /run/nginx && chown -R nginx:nginx /run/nginx && \
+    chown -R nginx:nginx /usr/share/nginx/html /var/cache/nginx /var/log/nginx /etc/nginx/conf.d && \
     chmod +x /entrypoint.sh
 
 USER nginx
 
 EXPOSE 5175
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=5 \
-  CMD wget --no-verbose --tries=3 --spider http://localhost:${PORT}/health || exit 1
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT}/health || exit 1
 
 ENTRYPOINT ["/entrypoint.sh"]
