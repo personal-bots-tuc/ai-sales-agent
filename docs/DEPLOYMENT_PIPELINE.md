@@ -36,8 +36,8 @@ feature/[BOT-XXX]-desc ─PR+CI verde─► develop ─auto-deploy─► STAGING
 
 | Ambiente | Mecanismo | Rama | URL |
 |----------|-----------|------|-----|
-| Staging | Railway (auto-deploy al configurar watcher; fallback manual `railway link -s ai-sales-agent -e staging && railway up -d -y` desde `develop`) | `develop` | https://ai-sales-agent-staging.up.railway.app |
-| Production | Railway (watcher `main`; fallback manual `railway up -d -y` desde `main`) | `main` | https://ai-sales-agent-production-f16e.up.railway.app |
+| Staging | Railway **auto-deploy** (watcher GitHub configurado) | `develop` | https://ai-sales-agent-staging.up.railway.app |
+| Production | Railway **auto-deploy** (watcher `main`) | `main` | https://ai-sales-agent-production-f16e.up.railway.app |
 
 > **Pendiente operativo:** branch watchers de Railway §8 del doc maestro. Mientras no estén, los deploys se disparan manual con el comando indicado.
 > **Nota histórica:** este repo usó rama `master` como default; estandarizada a `main` el 2026-10-07. La rama remota `master` queda huérfana hasta confirmar que ningún watcher la usa (ver §8 del doc maestro).
