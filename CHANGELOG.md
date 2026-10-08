@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Pipeline staging→production: workflow `smoke-staging.yml` (smoke tests automáticos post-deploy en staging), checklist de validación manual obligatorio (`docs/STAGING_VALIDATION_CHECKLIST.md`), PR template con sección RELEASE, branch protection (`develop`/`main`) y GitHub Environments (`staging`/`production`). [[BOT-100](https://github.com/personal-bots-tuc/ai-sales-agent/pull/1)], [[#2](https://github.com/personal-bots-tuc/ai-sales-agent/pull/2)]
+- `docs/DEPLOYMENT_PIPELINE.md` — fuente de verdad del mecanismo de deploy de este repo. [BOT-102](https://github.com/personal-bots-tuc/ai-sales-agent/pull/TBD)
 - Initial Docker + Railway deployment setup
 - Runtime configuration via nginx + envsubst
 - Healthcheck endpoint /health
