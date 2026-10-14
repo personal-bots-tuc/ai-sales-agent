@@ -130,34 +130,88 @@ function handleSseEvent(
   return handler(parsed.data, params);
 }
 
-export async function sendChatMessage(params: SendChatMessageParams): Promise<void> {
-  const res = await fetch(`${BASE_URL}/ai/chat`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(params),
-  });
-  if (!res.ok) throw new Error('Error enviando mensaje');
+export interface ChatStreamOptions {
+  /** Señal externa para cancelar el stream (desmontaje del chat, nueva sesión). */
+  signal?: AbortSignal;
+  /** Timeout de seguridad del stream completo (default 90s). */
+  timeoutMs?: number;
+}
 
+const DEFAULT_STREAM_TIMEOUT_MS = 90_000;
+
+/** Une una señal externa con el controlador interno de timeout. */
+function linkSignal(external: AbortSignal | undefined, controller: AbortController): void {
+  if (!external) return;
+  if (external.aborted) {
+    controller.abort(external.reason);
+    return;
+  }
+  external.addEventListener('abort', () => controller.abort(external.reason), { once: true });
+}
+
+function isTimeoutAbort(signal: AbortSignal): boolean {
+  return (
+    signal.aborted && signal.reason instanceof DOMException && signal.reason.name === 'TimeoutError'
+  );
+}
+
+function isIntentionalAbort(signal: AbortSignal): boolean {
+  return signal.aborted && !isTimeoutAbort(signal);
+}
+
+async function readSseStream(res: Response, params: SendChatMessageParams): Promise<void> {
   const reader = res.body?.getReader();
   if (!reader) return;
 
   const decoder = new TextDecoder();
   let buffer = '';
-  let shouldContinue = true;
 
-  while (shouldContinue) {
+  for (;;) {
     const { done, value } = await reader.read();
-    if (done) break;
+    if (done) return;
     buffer += decoder.decode(value, { stream: true });
     const lines = buffer.split('\n\n');
     buffer = lines.pop() ?? '';
     for (const chunk of lines) {
       const parsed = parseSseChunk(chunk);
-      if (parsed && !handleSseEvent(parsed, params)) {
-        shouldContinue = false;
-        break;
-      }
+      if (parsed && !handleSseEvent(parsed, params)) return;
     }
+  }
+}
+
+export async function sendChatMessage(
+  params: SendChatMessageParams,
+  options: ChatStreamOptions = {}
+): Promise<void> {
+  const controller = new AbortController();
+  linkSignal(options.signal, controller);
+
+  const timeoutMs = options.timeoutMs ?? DEFAULT_STREAM_TIMEOUT_MS;
+  const timeout = setTimeout(() => {
+    controller.abort(new DOMException('Timeout', 'TimeoutError'));
+  }, timeoutMs);
+
+  try {
+    const res = await fetch(`${BASE_URL}/ai/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error('Error enviando mensaje');
+    await readSseStream(res, params);
+  } catch (err) {
+    // Timeout: avisar para no dejar el chat "escribiendo…" eterno; la conexión
+    // ya quedó liberada (no mantiene Railway despierto).
+    if (isTimeoutAbort(controller.signal)) {
+      params.onError?.('El asistente tardó demasiado en responder. Probá de nuevo.');
+      return;
+    }
+    // Abort intencional por el caller (desmontaje/cambio de sesión): silencioso.
+    if (isIntentionalAbort(controller.signal)) return;
+    throw err;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

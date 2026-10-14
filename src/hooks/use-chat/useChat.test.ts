@@ -147,4 +147,59 @@ describe('useChat', () => {
       paymentIntent: 'cash',
     });
   });
+
+  it('passes an AbortSignal so the stream can be cancelled', async () => {
+    const { result } = renderHook(() => useChat(mockOptions));
+
+    await act(async () => {
+      await result.current.sendMessage('Hola');
+    });
+
+    const [, options] = vi.mocked(sendChatMessage).mock.calls[0];
+    expect(options?.signal).toBeInstanceOf(AbortSignal);
+    expect(options?.signal?.aborted).toBe(false);
+  });
+
+  it('aborts the in-flight stream when a new message is sent', async () => {
+    let resolveFirst!: () => void;
+    const firstPending = new Promise<void>(resolve => {
+      resolveFirst = resolve;
+    });
+    vi.mocked(sendChatMessage).mockImplementation(async params => {
+      await firstPending;
+      params.onDone?.();
+    });
+
+    const { result } = renderHook(() => useChat(mockOptions));
+
+    // Primer mensaje queda en vuelo
+    void act(() => {
+      void result.current.sendMessage('primero');
+    });
+    const firstSignal = vi.mocked(sendChatMessage).mock.calls[0][1]?.signal;
+    expect(firstSignal?.aborted).toBe(false);
+
+    // Segundo mensaje: aborta el stream anterior
+    vi.mocked(sendChatMessage).mockResolvedValue(undefined);
+    await act(async () => {
+      await result.current.sendMessage('segundo');
+    });
+
+    expect(firstSignal?.aborted).toBe(true);
+    resolveFirst();
+  });
+
+  it('aborts the stream on unmount so the connection is released', async () => {
+    vi.mocked(sendChatMessage).mockImplementation(() => new Promise<void>(() => {}));
+
+    const { result, unmount } = renderHook(() => useChat(mockOptions));
+
+    act(() => {
+      void result.current.sendMessage('Hola');
+    });
+    const signal = vi.mocked(sendChatMessage).mock.calls[0][1]?.signal;
+
+    unmount();
+    expect(signal?.aborted).toBe(true);
+  });
 });
