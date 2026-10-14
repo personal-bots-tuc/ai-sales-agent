@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Streams SSE sin cancelación (BOT-108)** — `sendChatMessage` ahora acepta
+  `AbortSignal` + timeout de seguridad (90s) y `useChat` aborta el stream al desmontar,
+  al cambiar de sesión y al enviar un mensaje nuevo (uno a la vez). Antes un stream
+  colgado quedaba abierto hasta cerrar la pestaña, manteniendo el backend despierto
+  (bloquea Railway App Sleep). Corrige el drift entre `docs/agent/traps.md` y el código
+  (el doc ya prometía AbortController).
+
 ### Added
 - Pipeline staging→production: workflow `smoke-staging.yml` (smoke tests automáticos post-deploy en staging), checklist de validación manual obligatorio (`docs/STAGING_VALIDATION_CHECKLIST.md`), PR template con sección RELEASE, branch protection (`develop`/`main`) y GitHub Environments (`staging`/`production`). [[BOT-100](https://github.com/personal-bots-tuc/ai-sales-agent/pull/1)], [[#2](https://github.com/personal-bots-tuc/ai-sales-agent/pull/2)]
 - `docs/DEPLOYMENT_PIPELINE.md` — fuente de verdad del mecanismo de deploy de este repo. [BOT-102](https://github.com/personal-bots-tuc/ai-sales-agent/pull/4)

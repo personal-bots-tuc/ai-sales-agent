@@ -63,3 +63,7 @@ update_when: when new non-obvious behavior is confirmed
 **Problema**: Lockfile pnpm incompatible con Railway/Docker cache.
 **Solución**: Eliminar `pnpm-lock.yaml`, usar `package-lock.json` npm.
 **Verificación**: `npm ci` en Docker builder funciona correctamente.
+## Streams SSE: siempre cancelables (BOT-108, 2026-10-13)
+**Problema**: antes de esta fecha `docs/agent/traps.md` afirmaba que `useChat` usaba AbortController — era falso (drift doc/código). Un stream colgado quedaba abierto hasta cerrar la pestaña y mantenía el backend despierto en Railway (bloquea App Sleep).
+**Regla**: TODO stream/consumo SSE debe aceptar `AbortSignal` + timeout finito (default 90s). `useChat` aborta al desmontar, al cambiar de sesión y al enviar un mensaje nuevo. El timeout dispara `onError` (mensaje visible) — no silenciarlo con el estado de "escribiendo…" eterno.
+**Evidencia**: `src/api/bot/bot.ts` (`options.signal`, `options.timeoutMs`), `src/hooks/use-chat/index.ts` + tests de abort.
